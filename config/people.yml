@@ -1,0 +1,6 @@
+people:
+  - id: person-example
+    canonical_name: 範例人物
+    aliases:
+      - 範例委員
+    enabled: true

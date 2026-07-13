@@ -1,0 +1,18 @@
+sources:
+  legislature:
+    enabled: true
+    adapter: bills
+    concurrency: 2
+    requests_per_second: 1.0
+
+  cna:
+    enabled: false
+    adapter: cna
+    concurrency: 2
+    requests_per_second: 0.5
+
+  pts:
+    enabled: false
+    adapter: pts
+    concurrency: 2
+    requests_per_second: 0.5

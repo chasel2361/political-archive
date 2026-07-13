@@ -1,0 +1,71 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "political-archive"
+version = "0.1.0"
+description = "Configuration and local development foundation for Political Archive Crawler"
+readme = "README.md"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "alembic>=1.14",
+    "beautifulsoup4>=4.12",
+    "httpx>=0.28",
+    "lxml>=5.3",
+    "pydantic>=2.10",
+    "pydantic-settings>=2.7",
+    "pymupdf>=1.24",
+    "pymupdf4llm>=0.0.17",
+    "psycopg[binary]>=3.2",
+    "pyyaml>=6.0",
+    "sqlalchemy>=2.0",
+    "typer>=0.15",
+    "zstandard>=0.23",
+]
+
+[project.optional-dependencies]
+pdf-full = [
+    "marker-pdf",
+]
+
+[dependency-groups]
+dev = [
+    "mypy>=1.14",
+    "pytest>=8.3",
+    "pytest-asyncio>=0.24",
+    "pytest-cov>=6.0",
+    "ruff>=0.9",
+]
+
+[project.scripts]
+political-archive = "political_archive.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/political_archive"]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 88
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["political_archive"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+addopts = "--strict-markers"
+asyncio_mode = "auto"
+markers = [
+    "live: tests that access a live source website ( opt-in )",
+]
