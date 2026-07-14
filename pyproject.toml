@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "political-archive"
 version = "0.1.0"
-description = "Configuration and local development foundation for Political Archive Crawler"
+description = "Traceable political public-data crawler and archive"
 readme = "README.md"
 requires-python = ">=3.12,<3.13"
 dependencies = [
@@ -68,4 +68,5 @@ addopts = "--strict-markers"
 asyncio_mode = "auto"
 markers = [
     "live: tests that access a live source website ( opt-in )",
+    "integration: tests that require the dedicated local PostgreSQL test database",
 ]

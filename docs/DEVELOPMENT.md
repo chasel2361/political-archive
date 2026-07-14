@@ -1,40 +1,59 @@
 # Development Guide
 
-## Prerequisites
+## Prerequisites and setup
 
 - Python 3.12
 - `uv`
-- Docker Engine 與 Docker Compose（只在要啟動本機 PostgreSQL 時需要）
-
-不要手動建立或管理 `.venv`；由 `uv` 管理環境。
-
-## Initial setup
+- Docker Engine/Compose（需要本機 PostgreSQL 時）
 
 ```bash
 cp .env.example .env
-uv sync
+uv sync --frozen
 uv run political-archive --help
 ```
 
-`config/people.yml` 使用範例人物，不包含真實個資；`config/sources.yml` 啟用 legislature 的 `bills` 設定，其餘目前列出的來源停用。設定檔由 Pydantic 驗證，YAML 使用 `safe_load`，不執行 YAML 物件建構器。
+不要手動管理 `.venv`。`.env` 只放本機設定，不要提交 secrets。
 
-## Database
+## PostgreSQL and migrations
 
 ```bash
-docker compose config
 docker compose up -d db
 docker compose ps
+docker compose exec -T db pg_isready -U political_archive -d political_archive
+uv run alembic upgrade head
 ```
 
-Compose 目前只有 PostgreSQL 16 `db` service、healthcheck 與 named volume，且 PostgreSQL 只暴露在 loopback。M0 尚未建立 SQLAlchemy models 或 Alembic migrations，因此不要執行 schema upgrade；資料庫 schema 會在後續 milestone 實作。
+查看目前 migration：
+
+```bash
+uv run alembic current
+```
+
+Migration 是唯一 schema 寫入來源；程式不呼叫 `create_all`。M1 integration
+fixture 會以同一個 Compose PostgreSQL server 建立固定的
+`political_archive_test` database，先確認名稱、再執行 upgrade → downgrade →
+upgrade，預設只接受 `127.0.0.1`、`localhost` 或 `::1`，永遠不會 target 或
+drop dev `political_archive`。測試完成後只 downgrade 該 test database。CI 若
+明確需要 remote server，必須 opt-in `PA_ALLOW_REMOTE_TEST_DATABASE=true`；這
+會允許在 remote server 上操作固定的 test database，應視為有風險的例外。
+不要在保存開發資料的 database 上執行 `downgrade base` 來做 round-trip 測試。
 
 ## Quality checks
 
 ```bash
+uv run pytest tests/unit
+uv run pytest tests/integration
+uv run pytest
 uv run ruff check .
 uv run ruff format --check .
 uv run mypy src
-uv run pytest
 ```
 
-正常測試不連線 live website，也不要求資料庫。需要真實來源的契約測試未在 M0 實作；未來應使用 `@pytest.mark.live` 並以 `pytest -m live` 明確 opt-in。
+Unit tests 不需要 DB；integration marker 為 `integration`，live website tests
+仍需明確使用 `-m live`。
+
+## M1 transaction boundary
+
+每份 document 先將 raw/normalized artifact 以 content-addressed atomic write
+落盤，再在短 DB transaction 中寫入 document/revision。DB rollback 可能留下
+orphan artifact，這是刻意的安全取捨；cleanup/backup 尚未屬於 M1。

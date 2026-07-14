@@ -1,5 +1,6 @@
-"""Validated application and YAML configuration for the M0 foundation."""
+"""Validated application, database, and YAML configuration."""
 
+import ipaddress
 from pathlib import Path
 from typing import Any
 
@@ -72,6 +73,31 @@ class AppSettings(BaseSettings):
     database_name: str = "political_archive"
     database_user: str = "political_archive"
     database_password: SecretStr = SecretStr("dev-only-change-me")
+    database_pool_size: int = Field(default=5, ge=1, le=50)
+    database_pool_timeout: float = Field(default=30.0, gt=0, le=300)
+
+
+def validate_test_database_target(
+    host: str,
+    target_database: str,
+    development_database: str = "political_archive",
+    allow_remote: bool = False,
+) -> None:
+    """Reject unsafe integration-test database targets by default."""
+    if target_database == development_database:
+        raise ValueError("integration tests cannot target the development database")
+    normalized_host = host.strip().lower().strip("[]")
+    is_loopback = normalized_host == "localhost"
+    if not is_loopback:
+        try:
+            is_loopback = ipaddress.ip_address(normalized_host).is_loopback
+        except ValueError:
+            is_loopback = False
+    if not is_loopback and not allow_remote:
+        raise ValueError(
+            "integration tests require a loopback database host unless explicitly "
+            "opted in"
+        )
 
 
 class ProjectConfig(BaseModel):

@@ -8,7 +8,7 @@ app = typer.Typer(
     name="political-archive",
     help=(
         "Political Archive Crawler development CLI. "
-        "M0 currently provides project foundations only."
+        "Only foundation help and version commands are currently available."
     ),
     no_args_is_help=True,
 )

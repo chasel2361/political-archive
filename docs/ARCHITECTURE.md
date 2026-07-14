@@ -1,26 +1,41 @@
 # Architecture
 
-## Current M0 boundary
+## Current boundary
 
-M0 是設定、套件、CLI 入口與本機 PostgreSQL 開發環境的 foundation。資料庫 container 可啟動，但目前沒有 application schema、migration、ORM model 或資料存取層。CLI 只有 help/version，避免把尚未存在的 crawler 行為偽裝成可用命令。
+M0 是設定、套件、CLI entry point 與本機 PostgreSQL foundation。M1 加入 typed
+SQLAlchemy schema、Alembic migration、content-addressed evidence storage、
+hash/revision dedup helpers、crawl run tracking 與 review audit。沒有 async
+fetcher、真實 adapter、crawler container 或完整 CLI。
 
-## Planned flow
+## Evidence and database flow
 
 ```text
-scheduled/manual CLI
-        │
-        ▼
-async source adapters ──► source evidence ──► document pipeline
-        │                                      │
-        └──────────────────────────────────────┴──► PostgreSQL
+source result
+     │
+     ▼
+atomic content-addressed filesystem write
+     │ (failure leaves no partial destination)
+     ▼
+short per-document DB transaction
+     │
+     ├── document identity: external ID → canonical URL → hash candidates
+     └── immutable document revision/current pointer
 ```
 
-網路抓取預計使用 `httpx.AsyncClient`，並以 bounded concurrency、retry、ETag/Last-Modified 與內容大小限制保護來源。CPU-heavy 的 PDF/Marker/OCR 工作應移到 thread/process executor。原始證據與 normalized Markdown 將以 hash 和 parser metadata 追蹤，避免覆寫 revision。
+Storage 不 commit DB。檔案成功但 DB rollback 時可有安全 orphan；這避免為了
+避免 orphan 而覆寫或刪除可追溯證據，orphan cleanup 延後到後續 operations
+milestone。raw PDF 不壓縮，text/JSON/Markdown 使用 zstd；raw hash 與
+normalized hash 分開保存。
 
-## First vertical slice
+## Database boundary
 
-第一個實際 adapter 是 **legislature bills**：立法院議案／法案。這是規劃中的 M3 垂直切片，不代表目前已連接或抓取真實網站。它完成後才會宣稱具備 discover、fetch、parse、normalize、deduplicate 與 database recording 的端到端能力。
+`db.py` 只建立 synchronous SQLAlchemy 2 engine/session factory；import 不連線。
+設定的 pool size/timeout 可由 `PA_DATABASE_POOL_SIZE` 與
+`PA_DATABASE_POOL_TIMEOUT` 控制，password 使用 `SecretStr` 與 SQLAlchemy
+masked URL，不進 repr、log 或錯誤摘要。所有 schema 變更只能透過 Alembic。
 
-## Deliberately deferred
+## Deferred flow
 
-SQLAlchemy data models、Alembic schema/migration、source adapters、document parsing/normalization、person matching、storage pipeline、crawl tracking、exports 與 backup/cleanup scripts 均留待 roadmap 指定 milestone。Web frontend、FastAPI、Redis、Celery、OpenSearch、pgvector、LLM service 及 IVOD video download 不在目前第一階段範圍。
+未來 async source adapters 會使用 bounded concurrency、retry 與 response limits；
+PDF/OCR/Marker 等 CPU-heavy 工作移至 executor。第一個 adapter 是 legislature
+bills（M3 規劃），目前不代表已連接真實網站或達到 R1。
